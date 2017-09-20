@@ -1,0 +1,37 @@
+1. make:
+visar att vi har regler med beroenden. regeln list, beror på list.o som beror på list.c och list.h ()pre requisirs.
+
+2.  Manuel minneshantering:
+Via make kör vi valgrind, så att vi slipper skriva alla flaggor osv själva. (make valgrind)
+
+vårat lilla program är fritt från leckage, för att vi frigör allt minne med free, som låsts via calloc via funktionen remove_whole_list.
+
+Hur uppstår minnesläckage?
+ - när man låser minne som man sedan inte frigör innan programmets avslut.
+
+Vilken del av ett program ansvarar för att frigöra minnet?
+ - i vårat fal så har vi en funktion som gör detta remove_whole_list, men ansvaret för att den funktionen används ligger på programmeraren.
+ När avgör man att en bit allokerat minne är "färdiganvänt" och går att frigöra?
+ - När man inte behöver använda det alls så går det att frigöra. När ingen funktion eller resterande del av programmet beror på den "låsta minnesbiten". // Här kan man hänvisa till delen som vi ändrade i remove_list, förut så tog vi bort den sista i listan vilket var dumt komplexitet, men det var för att jag inte fattade hur man annars inte skule få minnes läckor. ett problem som sparades.
+
+Vad kan hända om ett allokerat utrymme frigörs "för tidigt"?
+- man försöker tillexempel peka på någinting som kanske inte finns längrre eftersom mellan instruktionerna så kanske operativsystemet har använd det utrymmet för någonting annat. (Peka upp i stacken orsakar detta t.ex)
+
+- Valgrin är ett verktyg som visar på minnesläckage (hur många), samt kan hänvisa till vart detta minneläckage verkar komma ifrån.
+
+3. minneshantering - vi hanterar minne innevär att hantera adresser, men det vi vill är så klart vill komma åt de t som finns lagrat på detta minne. Därmed gör vi en smidig övergång till värdeöverföring.
+
+referenssemantik: pekare - när vi t.ex avreferear ngt eller ger adressen till ett argument
+
+Om man säger int *x = 2
+och sedan att int y = *x
+
+och man sedan ändrar värdet på x, så ändras också värdet på y. 
+
+värdessemantik:
+x = 2;
+y = x
+
+om man nu ändrar värdet av x så att x = 7, men nu har vi bara ändrat en kopia av x, så y kommer fortfarande vara 2.
+
+Denna förvirring kring referens semantik och värdesemantik var ett problem som uppstod tidigare när vi skapade funktionen list_get. Och vi tänkte nu demonstrera hur man kan lösa ett sådant problem med gdb. 
