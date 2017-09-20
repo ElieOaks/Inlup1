@@ -98,7 +98,7 @@ bool list_insert(list_t *list, int index, L elem)
   else
     {
       link_t *current = list->first;
-      for (int i = 0; i < index-1 || ( index < 0 && i < l_length+index); i++)
+      for (int i = 0; i < index-1 || ( index < 0 && i < l_length+index); i++) // TODO: gör om detta till en funktion
         {
           current = current->next;
         }
@@ -139,13 +139,52 @@ bool list_remove(list_t *list, int index, L *elem)
   return false;
 }
 
-L *list_get(list_t *list, int index)
+void list_remove_all (list_t *list)
 {
-  
+  L temp;
+  int length = list_length(list);
+  for (int i = length; i != 0; i--)
+    {
+      list_remove(list, 0, &temp);
+    }
+  free(list);
 }
 
-L *list_first(list_t *list);
-L *list_last(list_t *list);
+L *list_get(list_t *list, int index)
+{
+  int length = list_length(list);
+  link_t *current = list->first;
+  
+  if (list->first == NULL || index < -length || index >= length)
+    {
+      printf("Index is out of bounds. Please try again. \n");
+      return false;
+    }
+  else
+    {
+      for (int i = index; (i != 0 && i > -length); --i)
+        {
+          current = current->next;
+        }
+      L *cur_value = &(current->value);
+      return cur_value;
+      
+    
+    }
+}
+
+L *list_first(list_t *list)
+{
+  L *first_value = &(list->first->value);
+  return first_value;
+}
+
+L *list_last(list_t *list)
+{
+   L *last_value = &(list->last->value);
+  return last_value;
+}
+
 
 int list_length(list_t *list)
 {
@@ -158,6 +197,10 @@ int list_length(list_t *list)
   return count;
 }
 
+void list_delete(list_t *list, list_action cleanup);
+
+void list_apply(list_t *list, list_action2 fun, void *data);
+
 int main (void)
 {
   list_t *list = new_list();
@@ -167,9 +210,10 @@ int main (void)
   list_prepend(list, 4);
   list_prepend(list, 5);
   //list_insert(list, 2, 10); // här läggs det in skit på ett valt index
-  L elem = 22; // fattar inte vad man ska med elem till???
-  list_remove(list, 4, &elem);
+  //L elem = 22; // 
+  list_get(list, 0);
   list_print(list); // här skrivs allt ut
+  list_remove_all(list);
 }
 
 
