@@ -17,7 +17,7 @@ struct link
   link_t *next;
 };
 
-list_t *new_list()
+list_t *list_new()
 {
   list_t *new_l = calloc(1, sizeof(list_t));
   new_l->first = NULL;
@@ -75,8 +75,8 @@ void print_list(list_t *list)
     link_t *current = list->first;
     while (current != NULL)
       {
-        int nr = current->value;
-        printf("%d \n", nr);
+        int *nr = current->value;
+        printf("%d \n", *nr);
         current = current->next;
       }
     }
@@ -127,7 +127,6 @@ bool list_insert(list_t *list, int index, L elem)
 
 bool list_remove(list_t *list, int index, L *elem)
 {
-  //Vi tar ju bort den i slutet av denna funktion, så varför retuneras till &elem?
  int length_l = list_length(list);
  if ( list->first == NULL || index < -length_l || index >= length_l)
    {
@@ -158,19 +157,20 @@ bool list_remove(list_t *list, int index, L *elem)
 
 void remove_whole_list(list_t *list)
 {
-  L temp; //för att list_remove skall fungera, men då listan ska bort behöver väderna ej sparas. 
+  L value = 0; //för att list_remove skall fungera, men då listan ska bort behöver värderna ej sparas. 
   int len = list_length(list);
-  for (; len != 0; --len)
+  int counter = 1;
+  for (; counter != len+1; ++counter)
     {
-      list_remove(list, len-1, &temp); 
+      list_remove(list, 0, &value); // ändra så den f linjär komplex. len = 0.
+      printf("\ndid\n");
     }
   free(list);  
 }
 
-
 // --------------------------------------------REKURSIV BORTTAGNING FÖR LIST ------------------------------------
 
-void rec_remove_link(link_t *cur)
+void rec_remove_links(link_t *cur)
 {
   if (cur== NULL)
     {
@@ -178,23 +178,23 @@ void rec_remove_link(link_t *cur)
     }
   else
     {
-      rec_remove_link((cur->next));
+      rec_remove_links((cur->next)); // -------------------------------------demonstrera för tidig friigörning, om free(cur) var ovanför. 
       free(cur);
-      puts("true");
+      puts("true"); //för att kolla att den fungerar.
     }
 }
 
-void rec_remove_list(list_t *list)
+void rec_remove_whole_list(list_t *list)
 {
   link_t *cur = list->first;
-  rec_remove_link(cur);
-  free(list);
+  rec_remove_links(cur);
+  free(list); // glömde att frigöra detta, här hjälpe valgrind genom att peka ut calloc och list_new, alltså listan i sig inte hade frigjprts efter att den skapats. 
 }
 
 
 // --------------------------------------------REKURSIV BORTTAGNING FÖR LIST ------------------------------------
 
-L *list_get(list_t *list, int index)
+L *list_get(list_t *list, int index) // Återskapa tidgare fel. 
 {
   int len = list_length(list); 
   link_t *current = list->first;
@@ -230,10 +230,13 @@ L *list_last(list_t *list)
   return elem;
 }
 
+/*
 int main()
 {
   
-  list_t *list = new_list();
+  list_t *list = list_new;
+
+
   list_prepend(list, 7);
   list_prepend(list, 6);
   list_prepend(list, 5);
@@ -241,10 +244,11 @@ int main()
   list_prepend(list, 3);
   list_prepend(list, 2);
   list_prepend(list, 1);
+
   print_list(list);
-  remove_whole_list(list);
+  rec_remove_whole_list(list);
   return 0;
 }
-
+*/
 
 
