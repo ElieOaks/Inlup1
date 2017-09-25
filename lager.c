@@ -20,6 +20,7 @@ struct have_tree
   tree_t *new; // Trädet efter ändring. Undo gör att *new = *old. 
 };
 
+typedef void*(list_func)(list_t *list, int index);
 
 #define QUIT 'Q'
 
@@ -27,20 +28,27 @@ struct have_tree
 #define LEFT 'L'
 
 #define UNDO 'U'
+#define PRODUCT 'U'
 
 #define REMOVE 'R'
 #define RIGHT 'R'
 
 #define ADD 'A'
+
 #define EDIT 'E'
 #define EXIT 'E'
+
+
 
 //------------------------------- All functions in this file: -----------------------
 void add_goods(tree_t *tree);
 shelf_t *make_shelf(int amount, char* hylla);
 char *ask_question_key(char *question, tree_t *tree);
 goods_t new_goods(char *name, char *desc, int price, int amount, char *hylla);
-void list_goods(tree_t *tree);
+void list_goods(tree_t *tree, list_func);   
+void list_shelves (goods_t *goods);
+void show_goods(tree_t, K name);
+
 //-------------------------------Add goods ----------------------------
 
 void add_goods(tree_t *tree)
@@ -49,7 +57,7 @@ void add_goods(tree_t *tree)
   char *desc = ask_question_string("Describe goods\n");
   int price = ask_question_int("Price of goods\n");
   char amount = ask_question_int("Amount of goods?\n");
-  char *hylla =  ask_question_hylla("Place goods on what shelf?\n"); //Ska inet kunna placera olika grejer på en hylla.
+  char *hylla =  ask_question_hylla("Place goods on what shelf?\n"); //Ska inte kunna placera olika grejer på en hylla.
 
   goods_t new_good = new_goods(name, desc, price, amount, hylla);
   tree_insert(tree, name, &new_good);
@@ -88,7 +96,11 @@ char *ask_question_key(char *question, tree_t *tree)
 {
   K answer;
   answer = ask_question_string(question);
+
+  printf("Answer is: %s", answer);
   bool already_key = tree_has_key(tree, answer);
+
+  printf (already_key ? "\nTrue\n" : "\nFalse\n");
   
   if (already_key == false)
     {
@@ -124,9 +136,26 @@ void list_helper(tree_t *tree, int page) //20 per page. page index from 0. //
   return;
 }
 
-void list_goods(tree_t *tree) //Printar ut två gånger när man trycker left och right. 
+K choose_key_find(tree_t *tree, int index, int page)//tar in korrekt index, inte vad väljaren skriver!!
 {
-  int tot_pages = tree_size(tree) / 20 + (tree_size(tree)%20 > 0 ? 1 : 0); // amount of pages as needed.
+  K *buf = tree_keys(tree);
+  int goods_amount = tree_size(tree);
+  index = index + 20 * page;
+  if (index < goods_amount)
+    {
+      K choice = buf[index-1]; //-1 as list is indexed from 1, not 0.
+      return choice;
+    }
+  else
+    {
+      puts("Your number is out of bounds, please choose a nr from available goods");
+      return NULL;
+    }
+}
+
+void list_goods(tree_t *tree, list_func function)
+{
+  int tot_pages = tree_size(tree) / 20 + (tree_size(tree)%20 > 0 ? 1 : 0); // amount of pages as needed + 1 page if amount is not devisable by 20. 
   int first_page = 0;
   int *cur_page = &first_page;
    list_helper(tree, *cur_page);
@@ -135,7 +164,8 @@ void list_goods(tree_t *tree) //Printar ut två gånger när man trycker left oc
     {
       printf("\nTotalt antal varor: %d\n", tree_size(tree));
       char choice = ask_question_menu("\n\n[L]eft <-\t"
-                                      "[R]ight ->\t"
+                                      "Choose prod[u]t"
+                                      "-> [R]ight\t"
                                       "[E]xit\n");
       switch(choice)
 	{
@@ -170,6 +200,9 @@ void list_goods(tree_t *tree) //Printar ut två gånger när man trycker left oc
             }
           break;
 
+        case PRODUCT:
+          break;
+
           
 	case EXIT:
           return;          
@@ -185,12 +218,14 @@ void display_goods();
 
 void undo_action();
 
+/*
 tree_t *copy_tree(tree_t *tree)
 {
   tree_t *copy = calloc(1, sizeof(tree));
   *copy = *tree;
   return copy;
 }
+*/
 
 //-------------------------------------------------------------------------------------
 
@@ -227,7 +262,7 @@ int event_loop(tree_t *tree)
           //undo_action;
           break;
 	case LIST:
-	  list_goods(tree);
+	  list_goods(tree, NULL);
 	  break;
 	case QUIT:
 	  //puts("Bye bye");
