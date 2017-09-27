@@ -20,7 +20,7 @@ struct have_tree
   tree_t *new; // Trädet efter ändring. Undo gör att *new = *old. 
 };
 
-typedef void*(list_func)(list_t *list, int index);
+typedef void(goods_func)(goods_t *elem);
 
 #define QUIT 'Q'
 
@@ -44,25 +44,71 @@ typedef void*(list_func)(list_t *list, int index);
 void add_goods(tree_t *tree);
 shelf_t *make_shelf(int amount, char* hylla);
 char *ask_question_key(char *question, tree_t *tree);
-goods_t new_goods(char *name, char *desc, int price, int amount, char *hylla);
-void list_goods(tree_t *tree, list_func);   
+goods_t *new_goods(char *name, char *desc, int price, list_t *shelves);
+void list_goods(tree_t *tree, goods_func);   
 void list_shelves (goods_t *goods);
-void show_goods(tree_t, K name);
+void show_goods(tree_t *tree, K name);
+void index_action(tree_t *tree, int page, goods_func function);
+                    
 
+
+// ------------------------------list good ---------------------------------------
+void list_shelves (goods_t *goods)
+{
+  list_t *shelves = goods->shelves;
+  int length = list_length(shelves);
+  for (int i = 0; i != length; i++)
+  {
+    shelf_t *cur_shelf = (shelf_t *) list_get(shelves, i);
+    printf("Shelf: %s  Amount: %d  \n", cur_shelf->Hylla, cur_shelf->Antal);
+  }
+  return;
+}
+
+void show_goods(tree_t *tree, K name)
+{
+  goods_t *goodet = (goods_t *) tree_get(tree, name);
+
+  
+  
+  // TODO: gör om picked_goods till en goods_t
+  printf("Name: %s \n", goodet->Name);
+  printf("Description: %s \n", goodet->Desc);
+  printf("Price: %d \n", goodet->Price);
+
+  list_shelves(goodet);
+  
+}
 //-------------------------------Add goods ----------------------------
+
+list_t *make_shelves_list(int shelf_amount)
+{
+  list_t *new_l = list_new();
+  while (shelf_amount != 0)
+    {
+      char *hylla =  ask_question_hylla("Place goods on what shelf?\n");
+      int amount = ask_question_int("Amount of goods on this shelf?\n");
+      shelf_t *new_shelf = make_shelf(amount, hylla);
+      list_prepend(new_l, new_shelf);
+      --shelf_amount;
+    }
+  return new_l;
+}
+
 
 void add_goods(tree_t *tree)
 {
   K name = ask_question_key("Name goods\n", tree); //två objekt får ej ha samma namn. 
   char *desc = ask_question_string("Describe goods\n");
   int price = ask_question_int("Price of goods\n");
-  char amount = ask_question_int("Amount of goods?\n");
-  char *hylla =  ask_question_hylla("Place goods on what shelf?\n"); //Ska inte kunna placera olika grejer på en hylla.
+  int hyllor = ask_question_int("place on how many shelves?");
+  list_t *shelves_list = make_shelves_list(hyllor);
 
-  goods_t new_good = new_goods(name, desc, price, amount, hylla);
-  tree_insert(tree, name, &new_good);
+  goods_t *new_good = new_goods(name, desc, price, shelves_list);
+  tree_insert(tree, name, new_good);
   return;
 }
+
 
 shelf_t *make_shelf(int amount, char* hylla) //Måste frigöras!
 {
@@ -72,21 +118,15 @@ shelf_t *make_shelf(int amount, char* hylla) //Måste frigöras!
   return new_shelf;
 }
 
-goods_t new_goods(K name, char *desc, int price, int amount, char *hylla)
+goods_t *new_goods(K name, char *desc, int price, list_t *shelves)
 {
   goods_t *new_g = calloc(1, sizeof(goods_t));
   new_g->Name = name;
   new_g->Desc = desc;
   new_g->Price = price;
+  new_g->shelves = shelves; // TODO - kan inte placera varor på tagna hyllor. 
 
-  shelf_t *new_shelf = make_shelf(amount, hylla);
-
-  list_t *new_shelf_list = list_new();
-  list_append(new_shelf_list, new_shelf);
-
-  new_g->shelves = new_shelf_list;
-
-  return *new_g;
+  return new_g;
 }
 
 //----------------------------------------------------
@@ -122,6 +162,12 @@ void remove_goods(tree_t *tree);
 void edit_goods();
 
 // ----------------------------------list goods ---------------------------------------
+
+void does_nothing(goods_t *elem)
+{
+  return;
+}
+
 void list_helper(tree_t *tree, int page) //20 per page. page index from 0. //
 {
   K *buf = tree_keys(tree);
@@ -136,14 +182,14 @@ void list_helper(tree_t *tree, int page) //20 per page. page index from 0. //
   return;
 }
 
-K choose_key_find(tree_t *tree, int index, int page)//tar in korrekt index, inte vad väljaren skriver!!
+K index_to_key(tree_t *tree, int index, int page)//tar in korrekt index, inte vad väljaren skriver!!
 {
   K *buf = tree_keys(tree);
   int goods_amount = tree_size(tree);
   index = index + 20 * page;
   if (index < goods_amount)
     {
-      K choice = buf[index-1]; //-1 as list is indexed from 1, not 0.
+      K choice = buf[index]; //-1 as list is indexed from 1, not 0.
       return choice;
     }
   else
@@ -153,7 +199,17 @@ K choose_key_find(tree_t *tree, int index, int page)//tar in korrekt index, inte
     }
 }
 
-void list_goods(tree_t *tree, list_func function)
+void index_action(tree_t *tree, int page, goods_func function)
+{
+  int num = ask_question_int("Choose product nr:\n");
+  K key_name = index_to_key(tree, (num-1), page);
+  show_goods(tree, key_name);
+  goods_t *elem = (goods_t *) tree_get(tree, key_name);
+  function(elem);  
+}
+
+
+void list_goods(tree_t *tree, goods_func function)
 {
   int tot_pages = tree_size(tree) / 20 + (tree_size(tree)%20 > 0 ? 1 : 0); // amount of pages as needed + 1 page if amount is not devisable by 20. 
   int first_page = 0;
@@ -201,6 +257,7 @@ void list_goods(tree_t *tree, list_func function)
           break;
 
         case PRODUCT:
+          index_action(tree, *cur_page, function);
           break;
 
           
@@ -210,23 +267,36 @@ void list_goods(tree_t *tree, list_func function)
     }
   return;
 }
-  // -------------------------------------------------------------------------------------
-
-void display_goods();
-
 //----------------------------------undo action ---------------------------------------
 
 void undo_action();
 
 /*
+goods_t copy_elem(goods_t *elem)
+{
+  char *name = elem->Name;
+  char *desc = elem->Desc;
+  int pris = elem->Price;
+  list_t *shelf = elem->shelves;
+  
+  
+}
+
+
 tree_t *copy_tree(tree_t *tree)
 {
-  tree_t *copy = calloc(1, sizeof(tree));
-  *copy = *tree;
+  tree_t *copy = tree_new();
+  int tree_siz = tree_size(tree);
+  K *keys = tree_keys(tree);
+  for (int i = 0; i <= tree_siz; i++)
+    {
+      goods_t *elem = (goods_t *) tree_get(tree, keys[i]);
+      goods_t elem_copy = copy_elem(elem);
+      tree_insert(copy, *keys, elem);
+    }
   return copy;
 }
 */
-
 //-------------------------------------------------------------------------------------
 
 void exit_program()
@@ -262,7 +332,7 @@ int event_loop(tree_t *tree)
           //undo_action;
           break;
 	case LIST:
-	  list_goods(tree, NULL);
+	  list_goods(tree, does_nothing);
 	  break;
 	case QUIT:
 	  //puts("Bye bye");
