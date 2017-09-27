@@ -20,23 +20,35 @@ struct have_tree
   tree_t *new; // Trädet efter ändring. Undo gör att *new = *old. 
 };
 
-typedef void(goods_func)(goods_t *elem);
+struct action
+{
+  int type; // NOTHING = 0, ADD = 1, REMOVE = 2, EDIT = 3
+  goods_t *orig;
+  goods_t *copy;
+};
+
+typedef struct action action_t;
+typedef void(goods_func)(goods_t *elem, action_t *undo);
 
 #define QUIT 'Q'
 
 #define LIST 'L'
 #define LEFT 'L'
+#define SHELVES 'L'
 
 #define UNDO 'U'
 #define PRODUCT 'U'
 
 #define REMOVE 'R'
 #define RIGHT 'R'
+#define PRICE 'R'
 
 #define ADD 'A'
+#define AMOUNT 'A'
 
 #define EDIT 'E'
 #define EXIT 'E'
+#define DESCRIPTION 'E'
 
 
 
@@ -45,11 +57,11 @@ void add_goods(tree_t *tree);
 shelf_t *make_shelf(int amount, char* hylla);
 char *ask_question_key(char *question, tree_t *tree);
 goods_t *new_goods(char *name, char *desc, int price, list_t *shelves);
-void list_goods(tree_t *tree, goods_func);   
+void list_goods(tree_t *tree, goods_func, action_t *undo);   
 void list_shelves (goods_t *goods);
 void show_goods(tree_t *tree, K name);
-void index_action(tree_t *tree, int page, goods_func function);
-                    
+void index_action(tree_t *tree, int page, goods_func function, action_t *undo);
+goods_t *copy_goods(goods_t *goods);
 
 
 // ------------------------------list good ---------------------------------------
@@ -60,7 +72,7 @@ void list_shelves (goods_t *goods)
   for (int i = 0; i != length; i++)
   {
     shelf_t *cur_shelf = (shelf_t *) list_get(shelves, i);
-    printf("Shelf: %s  Amount: %d  \n", cur_shelf->Hylla, cur_shelf->Antal);
+    printf("%d. Shelf: %s  Amount: %d  \n",(i+1), cur_shelf->Hylla, cur_shelf->Antal);
   }
   return;
 }
@@ -75,7 +87,6 @@ void show_goods(tree_t *tree, K name)
   printf("Name: %s \n", goodet->Name);
   printf("Description: %s \n", goodet->Desc);
   printf("Price: %d \n", goodet->Price);
-
   list_shelves(goodet);
   
 }
@@ -136,12 +147,8 @@ char *ask_question_key(char *question, tree_t *tree)
 {
   K answer;
   answer = ask_question_string(question);
-
-  printf("Answer is: %s", answer);
   bool already_key = tree_has_key(tree, answer);
-
-  printf (already_key ? "\nTrue\n" : "\nFalse\n");
-  
+          
   if (already_key == false)
     {
       return answer;
@@ -156,14 +163,75 @@ char *ask_question_key(char *question, tree_t *tree)
 
 
 
-//--------------------------------------------------------------------
+//------------------------------------------------------------------------------------
 void remove_goods(tree_t *tree);
 
-void edit_goods();
+//--------------------------------- edit goods ---------------------------------------
+void edit_shelves(goods_t *vara)
+{
+  int index = ask_question_int("Choose index of shelf name to edit!\n");
+  shelf_t *shelf = (shelf_t *) list_get(vara->shelves, (index-1));
+  
+  char *hylla = ask_question_hylla("What is the new shelf?\n");
+
+  shelf->Hylla = hylla; 
+}
+
+void edit_shelves_amount(goods_t *vara)
+{
+  int index = ask_question_int("Choose index of shelf amount to edit!\n");
+  shelf_t *shelf = (shelf_t *) list_get(vara->shelves, (index-1));
+  
+  int amount = ask_question_int("What is the new amount on shelf?\n");
+
+  shelf->Antal = amount;
+
+}
+
+void edit_goods(goods_t *vara, action_t *undo)
+{
+  undo->type = 3;
+  undo->copy = copy_goods(vara);
+  undo->orig = vara;
+  while (true)
+    {
+      char choice = ask_question_menu("\nWhat do you want to edit?\n"
+                                      "D[E]scription\n"
+                                      "P[R]ice\n"
+                                      "She[L}ves\n"
+                                      "[A]mount\n"
+                                      "[Q]uit from editor\n");
+      switch(choice)
+	{
+	case DESCRIPTION:
+          printf("Current description: %s\n", vara->Desc);
+          puts("\n-----------------------------------------\n");
+          char *new_desc = ask_question_string("New description:\n");
+          vara->Desc = new_desc;            
+	  break;
+	case PRICE:
+          printf("Curren price: %d\n", vara->Price);
+          puts("\n-----------------------------------------\n");
+          int new_price = ask_question_int("New price:\n");
+          vara->Price = new_price; 
+          break;
+	case SHELVES:
+          list_shelves(vara);
+          edit_shelves(vara);
+          break;
+        case AMOUNT:
+          list_shelves(vara);
+          edit_shelves_amount(vara);
+	case QUIT:
+          return;
+        }
+    }
+  return;
+}
 
 // ----------------------------------list goods ---------------------------------------
 
-void does_nothing(goods_t *elem)
+void does_nothing(goods_t *elem, action_t *undo)
 {
   return;
 }
@@ -177,7 +245,7 @@ void list_helper(tree_t *tree, int page) //20 per page. page index from 0. //
   for (; i !=  goods_amount && i < (20 + 20 * page); i++)
     {
       K current = buf[i];
-      printf("%d.%s\n",(i%20)+1, current);
+      printf("\n%d.%s\n",(i%20)+1, current);
     }
   return;
 }
@@ -199,17 +267,22 @@ K index_to_key(tree_t *tree, int index, int page)//tar in korrekt index, inte va
     }
 }
 
-void index_action(tree_t *tree, int page, goods_func function)
+void index_action(tree_t *tree, int page, goods_func function, action_t *undo)
 {
   int num = ask_question_int("Choose product nr:\n");
+  if (tree_size(tree) == 0)
+    {
+      printf("\nThe catalogue is Empty, please add a product and try again\n");
+      return;
+    }
   K key_name = index_to_key(tree, (num-1), page);
   show_goods(tree, key_name);
   goods_t *elem = (goods_t *) tree_get(tree, key_name);
-  function(elem);  
+  function(elem, undo);  
 }
 
 
-void list_goods(tree_t *tree, goods_func function)
+void list_goods(tree_t *tree, goods_func function, action_t *undo)
 {
   int tot_pages = tree_size(tree) / 20 + (tree_size(tree)%20 > 0 ? 1 : 0); // amount of pages as needed + 1 page if amount is not devisable by 20. 
   int first_page = 0;
@@ -257,7 +330,8 @@ void list_goods(tree_t *tree, goods_func function)
           break;
 
         case PRODUCT:
-          index_action(tree, *cur_page, function);
+          index_action(tree, *cur_page, function, undo);
+          list_helper(tree, *cur_page);
           break;
 
           
@@ -269,34 +343,35 @@ void list_goods(tree_t *tree, goods_func function)
 }
 //----------------------------------undo action ---------------------------------------
 
-void undo_action();
-
-/*
-goods_t copy_elem(goods_t *elem)
+void undo_action(tree_t *tree, action_t *action)
 {
-  char *name = elem->Name;
-  char *desc = elem->Desc;
-  int pris = elem->Price;
-  list_t *shelf = elem->shelves;
-  
-  
-}
-
-
-tree_t *copy_tree(tree_t *tree)
-{
-  tree_t *copy = tree_new();
-  int tree_siz = tree_size(tree);
-  K *keys = tree_keys(tree);
-  for (int i = 0; i <= tree_siz; i++)
+  if (action->type == 3)
     {
-      goods_t *elem = (goods_t *) tree_get(tree, keys[i]);
-      goods_t elem_copy = copy_elem(elem);
-      tree_insert(copy, *keys, elem);
+      *action->orig = *action->copy;
+      puts("\nYour editing is undone!\n");
     }
-  return copy;
+  else
+    {
+      puts("There is nothing to undo\n");
+    }
+  action->type = 0;
 }
-*/
+
+
+
+
+goods_t *copy_goods(goods_t *goods)
+{
+  char *name = goods->Name;
+  char *desc = goods->Desc;
+  int pris = goods->Price;
+  list_t *shelf = goods->shelves;
+
+  goods_t *copy_g = new_goods(name, desc, pris, shelf);
+  return copy_g;
+}
+
+
 //-------------------------------------------------------------------------------------
 
 void exit_program()
@@ -308,6 +383,7 @@ void exit_program()
   
 int event_loop(tree_t *tree)
 {
+  action_t undo = (action_t) {.type = 0}; 
   while (true)
     {
       char choice = ask_question_menu("\n[A]dd Item to database\n"
@@ -326,13 +402,13 @@ int event_loop(tree_t *tree)
           //remove_goods();
           break;
 	case EDIT:
-          //edit_goods();
+          list_goods(tree, edit_goods, &undo);
           break;
 	case UNDO:
-          //undo_action;
+          undo_action(tree, &undo);
           break;
 	case LIST:
-	  list_goods(tree, does_nothing);
+	  list_goods(tree, does_nothing, &undo);
 	  break;
 	case QUIT:
 	  //puts("Bye bye");
